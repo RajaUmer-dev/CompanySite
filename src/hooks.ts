@@ -4,7 +4,7 @@ const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* Scroll-reveal via IntersectionObserver. Add `ref` to any element; it toggles `is-visible`. */
+/* Scroll-reveal via IntersectionObserver. */
 export function useReveal<T extends HTMLElement = HTMLDivElement>(options?: IntersectionObserverInit) {
   const ref = useRef<T>(null);
   useEffect(() => {
@@ -31,8 +31,8 @@ export function useReveal<T extends HTMLElement = HTMLDivElement>(options?: Inte
   return ref;
 }
 
-/* Count-up animation when the element scrolls into view. */
-export function useCountUp(target: number, duration = 1800) {
+/* Count-up animation when scrolled into view. */
+export function useCountUp(target: number, duration = 2000) {
   const ref = useRef<HTMLSpanElement>(null);
   const [value, setValue] = useState(0);
   const started = useRef(false);
@@ -52,7 +52,6 @@ export function useCountUp(target: number, duration = 1800) {
             const start = performance.now();
             const tick = (now: number) => {
               const p = Math.min((now - start) / duration, 1);
-              // easeOutExpo
               const eased = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
               setValue(target * eased);
               if (p < 1) requestAnimationFrame(tick);
@@ -71,7 +70,7 @@ export function useCountUp(target: number, duration = 1800) {
   return { ref, value };
 }
 
-/* Magnetic hover: element drifts toward the cursor within `strength` px. */
+/* Magnetic hover. */
 export function useMagnetic<T extends HTMLElement = HTMLButtonElement>(strength = 18) {
   const ref = useRef<T>(null);
 
@@ -107,7 +106,25 @@ export function useMagnetic<T extends HTMLElement = HTMLButtonElement>(strength 
   return ref;
 }
 
-/* Lenis smooth scroll. Returns nothing; sets up global smooth scroll. */
+/* Card spotlight: tracks mouse position for the radial glow. */
+export function useSpotlight<T extends HTMLElement = HTMLDivElement>() {
+  const ref = useRef<T>(null);
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+  }, []);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener('mousemove', onMouseMove);
+    return () => el.removeEventListener('mousemove', onMouseMove);
+  }, [onMouseMove]);
+  return ref;
+}
+
+/* Lenis smooth scroll. */
 export function useSmoothScroll() {
   useEffect(() => {
     if (prefersReducedMotion()) return;
@@ -119,7 +136,7 @@ export function useSmoothScroll() {
       const Lenis = (await import('lenis')).default;
       if (cancelled) return;
       lenis = new Lenis({
-        duration: 1.15,
+        duration: 1.2,
         easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         smoothWheel: true,
         touchMultiplier: 1.5,
@@ -139,7 +156,7 @@ export function useSmoothScroll() {
   }, []);
 }
 
-/* Custom cursor: a dot + a trailing ring that grows on interactive hover. */
+/* Custom cursor. */
 export function useCustomCursor() {
   useEffect(() => {
     if (prefersReducedMotion()) return;
@@ -164,13 +181,13 @@ export function useCustomCursor() {
       dot.style.left = `${mx}px`;
       dot.style.top = `${my}px`;
       const t = e.target as HTMLElement;
-      const interactive = !!t.closest('a, button, [data-cursor="hover"]');
+      const interactive = !!t.closest('a, button, [data-cursor="hover"], input, textarea');
       ring.classList.toggle('is-hovering', interactive);
     };
 
     const loop = () => {
-      rx += (mx - rx) * 0.18;
-      ry += (my - ry) * 0.18;
+      rx += (mx - rx) * 0.16;
+      ry += (my - ry) * 0.16;
       ring.style.left = `${rx}px`;
       ring.style.top = `${ry}px`;
       raf = requestAnimationFrame(loop);
@@ -185,4 +202,30 @@ export function useCustomCursor() {
       ring.remove();
     };
   }, []);
+}
+
+/* Scroll progress 0..1 for an element's passage through the viewport. */
+export function useScrollProgress() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onScroll = () => {
+      const r = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const start = vh * 0.8;
+      const end = -r.height + vh * 0.2;
+      const p = Math.min(1, Math.max(0, (start - r.top) / (start - end)));
+      setProgress(p);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+  return { ref, progress };
 }
